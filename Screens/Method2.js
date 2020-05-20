@@ -8,7 +8,8 @@ import {
     Linking,
     TextInput,
     ScrollView,
-    Alert
+    Alert,
+    StyleSheet
 } from 'react-native';
 import axios from 'axios';
 import NfcManager, { Ndef } from 'react-native-nfc-manager';
@@ -17,18 +18,6 @@ const RtdType = {
     URL: 0,
     TEXT: 1,
 };
-
-function buildUrlPayload(valueToWrite) {
-    return Ndef.encodeMessage([
-        Ndef.uriRecord(valueToWrite),
-    ]);
-}
-
-function buildTextPayload(valueToWrite) {
-    return Ndef.encodeMessage([
-        Ndef.textRecord(valueToWrite),
-    ]);
-}
 
 class App extends Component {
     constructor(props) {
@@ -47,7 +36,7 @@ class App extends Component {
         }
     }
 
-    async UpdateStatus(Message,error) {
+    async UpdateStatus(Message, error) {
         await axios.get(`https://us-central1-androidapp-1e1b8.cloudfunctions.net/getUserInput?value1=${error}&value2=${Message}&deviceId=${this.state.Device}`)
             .then((response) => {
                 console.log(response.data.result);
@@ -56,7 +45,6 @@ class App extends Component {
                 }
             })
             .catch((error) => {
-
                 Alert.alert("Please Check Your Internet Connection");
             });
     }
@@ -70,11 +58,11 @@ class App extends Component {
                     this._startNfc();
                 }
             })
-        try {
-            await NfcManager.registerTagEvent();
-        } catch (ex) {
-            NfcManager.unregisterTagEvent().catch(() => 0);
-        }
+        // try {
+        //     await NfcManager.registerTagEvent();
+        // } catch (ex) {
+        //     NfcManager.unregisterTagEvent().catch(() => 0);
+        // }
     }
 
     componentWillUnmount() {
@@ -86,98 +74,34 @@ class App extends Component {
     render() {
         let { supported, enabled, tag, isWriting, urlToWrite, parsedText, rtdType } = this.state;
         return (
-            <ScrollView style={{ flex: 1 }}>
-                {Platform.OS === 'ios' && <View style={{ height: 60 }} />}
+            <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
 
-                <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center' }}>
-                    <Text>{`Is NFC supported ? ${supported}`}</Text>
-                    <Text>{`Is NFC enabled (Android only)? ${enabled}`}</Text>
+                <TouchableOpacity
+                    onPress={this._startDetection}
+                    style={styles.buttonRead}>
+                    <Text style={styles.buttonText}>Read</Text>
+                </TouchableOpacity>
 
-                    <TouchableOpacity style={{ marginTop: 20 }} onPress={this._startDetection}>
-                        <Text style={{ color: 'blue' }}>Start Tag Detection</Text>
-                    </TouchableOpacity>
+                <Text style={{ marginTop: 20 }}>{`Current tag JSON: ${JSON.stringify(tag)}`}</Text>
+                {parsedText && <Text style={{ marginTop: 10, marginBottom: 20, fontSize: 18 }}>{`Parsed Text: ${parsedText}`}</Text>}
 
-                    <TouchableOpacity style={{ marginTop: 20 }} onPress={this._stopDetection}>
-                        <Text style={{ color: 'red' }}>Stop Tag Detection</Text>
-                    </TouchableOpacity>
 
-                    <TouchableOpacity style={{ marginTop: 20 }} onPress={this._clearMessages}>
-                        <Text>Clear</Text>
-                    </TouchableOpacity>
-
-                    <TouchableOpacity style={{ marginTop: 20 }} onPress={this._goToNfcSetting}>
-                        <Text >(android) Go to NFC setting</Text>
-                    </TouchableOpacity>
-
-                    {
-                        <View style={{ padding: 10, marginTop: 20, backgroundColor: '#e0e0e0' }}>
-                            <Text>(android) Write NDEF Test</Text>
-                            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <TextInput
-                                    style={{ width: 200 }}
-                                    placeholder='Enter text here'
-                                    value={urlToWrite}
-                                    onChangeText={urlToWrite => this.setState({ urlToWrite })}
-                                />
-                            </View>
-
-                            <TouchableOpacity
-                                style={{ marginTop: 20, borderWidth: 1, borderColor: 'blue', padding: 10 }}
-                                onPress={isWriting ? this._cancelNdefWrite : this._requestNdefWrite}>
-                                <Text style={{ color: 'blue' }}>{`(android) ${isWriting ? 'Cancel' : 'Write NDEF'}`}</Text>
-                            </TouchableOpacity>
-                        </View>
-                    }
-
-                    <Text style={{ marginTop: 20 }}>{`Current tag JSON: ${JSON.stringify(tag)}`}</Text>
-                    {parsedText && <Text style={{ marginTop: 10, marginBottom: 20, fontSize: 18 }}>{`Parsed Text: ${parsedText}`}</Text>}
-
-                </View>
                 <TouchableOpacity
                     onPress={() => this.props.navigation.navigate('method1')}
                     style={{
+                        width: '95%',
                         marginTop: 50, marginLeft: 20, marginRight: 20, height: 50, marginBottom: 10, alignItems: 'center',
                         justifyContent: 'center', borderRadius: 8, backgroundColor: 'blue'
                     }}>
                     <Text style={{ color: 'white' }}>1st Method</Text>
                 </TouchableOpacity>
-            </ScrollView>
+            </View>
         )
     }
 
 
 
 
-    _requestNdefWrite = () => {
-        let { isWriting, urlToWrite, rtdType } = this.state;
-        if (isWriting) {
-            return;
-        }
-
-        let bytes;
-
-        if (rtdType === RtdType.URL) {
-            bytes = buildUrlPayload(urlToWrite);
-        } else if (rtdType === RtdType.TEXT) {
-            bytes = buildTextPayload(urlToWrite);
-        }
-        console.log('bytessssss', bytes)
-
-        this.setState({ isWriting: true });
-        NfcManager.requestNdefWrite(bytes)
-            .then(() => this.UpdateStatus('NDEF write completed',''))
-            // .then(() => console.log('write completed'))
-            .catch((err) =>this.UpdateStatus('Error in NDEF Write',err) )
-            // .catch(err => console.warn(err))
-            .then(() => this.setState({ isWriting: false }));
-    }
-
-    _cancelNdefWrite = () => {
-        this.setState({ isWriting: false });
-        NfcManager.cancelNdefWrite()
-            .then(() => console.log('write cancelled'))
-            .catch(err => console.warn(err))
-    }
 
     _startNfc() {
         NfcManager.start({
@@ -194,12 +118,13 @@ class App extends Component {
             })
 
         if (Platform.OS === 'android') {
-            this.setState({Device:'Android'})
+            this.setState({ Device: 'Android' })
             NfcManager.getLaunchTagEvent()
                 .then(tag => {
                     console.log('launch tag', tag);
                     if (tag) {
                         this.setState({ tag });
+                        this.UpdateStatus('launch tag', tag)
                     }
                 })
                 .catch(err => {
@@ -212,93 +137,50 @@ class App extends Component {
                 .catch(err => {
                     console.log(err);
                 })
-            NfcManager.onStateChanged(
-                event => {
-                    if (event.state === 'on') {
-                        this.setState({ enabled: true });
-                    } else if (event.state === 'off') {
-                        this.setState({ enabled: false });
-                    } else if (event.state === 'turning_on') {
-                        // do whatever you want
-                    } else if (event.state === 'turning_off') {
-                        // do whatever you want
-                    }
-                }
-            )
-                .then(sub => {
-                    this._stateChangedSubscription = sub;
-                    // remember to call this._stateChangedSubscription.remove()
-                    // when you don't want to listen to this anymore
-                })
-                .catch(err => {
-                    console.warn(err);
-                })
+            // NfcManager.onStateChanged(
+            //     event => {
+            //         if (event.state === 'on') {
+            //             this.setState({ enabled: true });
+            //         } else if (event.state === 'off') {
+            //             this.setState({ enabled: false });
+            //         } else if (event.state === 'turning_on') {
+            //             // do whatever you want
+            //         } else if (event.state === 'turning_off') {
+            //             // do whatever you want
+            //         }
+            //     }
+            // )
+            //     .then(sub => {
+            //         this._stateChangedSubscription = sub;
+            //         // remember to call this._stateChangedSubscription.remove()
+            //         // when you don't want to listen to this anymore
+            //     })
+            //     .catch(err => {
+            //         console.warn(err);
+            //     })
         }
 
     }
 
     _onTagDiscovered = tag => {
         console.log('Tag Discovered', tag);
+        this.UpdateStatus('Tag Discovered', tag)
         this.setState({ tag });
-        let url = this._parseUri(tag);
-        if (url) {
-            Linking.openURL(url)
-                .catch(err => {
-                    console.warn(err);
-                })
-        }
-
         let text = this._parseText(tag);
         this.setState({ parsedText: text });
     }
 
     _startDetection = () => {
         NfcManager.registerTagEvent(this._onTagDiscovered)
-            .then(result => {this.UpdateStatus('Response of Register TagEvent',result)
+            .then(result => {
+                this.UpdateStatus('Response of Register TagEvent', result)
                 // console.log('registerTagEvent OK', result)
             }
             )
-            .catch((err) =>this.UpdateStatus('Error in Register TagEvent',err) )
-            // .catch(error => {
-            //     console.warn('registerTagEvent fail', error)
-            // })
-    }
-
-    _stopDetection = () => {
-        NfcManager.unregisterTagEvent()
-            .then(result => {
-                console.log('unregisterTagEvent OK', result)
-            })
-            .catch(error => {
-                console.warn('unregisterTagEvent fail', error)
-            })
-    }
-
-    _clearMessages = () => {
-        this.setState({ tag: null });
-    }
-
-    _goToNfcSetting = () => {
-        if (Platform.OS === 'android') {
-            NfcManager.goToNfcSetting()
-                .then(result => {
-                    console.log('goToNfcSetting OK', result)
-                })
-                .catch(error => {
-                    console.warn('goToNfcSetting fail', error)
-                })
-        }
-    }
-
-    _parseUri = (tag) => {
-        try {
-            if (Ndef.isType(tag.ndefMessage[0], Ndef.TNF_WELL_KNOWN, Ndef.RTD_URI)) {
-                return Ndef.uri.decodePayload(tag.ndefMessage[0].payload);
-            }
-        } catch (e) {
-            console.log(e);
-        }
-        return null;
+            .catch((err) => this.UpdateStatus('Error in Register TagEvent', err))
+        // .catch(error => {
+        //     console.warn('registerTagEvent fail', error)
+        // })
     }
 
     _parseText = (tag) => {
@@ -312,5 +194,20 @@ class App extends Component {
         return null;
     }
 }
-
+const styles = StyleSheet.create({
+    buttonRead: {
+        marginLeft: 20,
+        marginRight: 20,
+        height: 50,
+        width: '95%',
+        marginBottom: 10,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderRadius: 8,
+        backgroundColor: '#006C5B'
+    },
+    buttonText: {
+        color: 'white'
+    },
+});
 export default App;
